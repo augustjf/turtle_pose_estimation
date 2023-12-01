@@ -44,7 +44,7 @@ class BasicNavigator(Node):
         # Create the subscriver to 'amcl_pose' topic usign the QoSProfile specified
         self.model_pose_sub = self.create_subscription(PoseWithCovarianceStamped, 'amcl_pose', self._amclPoseCallback, amcl_pose_qos)
         # Create the publisher to 'initialpose' for the initialization
-        self.initial_pose_pub = self.create_publisher(PoseWithCovarianceStamped, 'initial_pose',10)
+        self.initial_pose_pub = self.create_publisher(PoseWithCovarianceStamped, 'initialpose',10)
         self.initial_pose_received = False
         
         # definition of action client connected to 'navigate to pose' and 'navigate_through_poses'
