@@ -8,6 +8,7 @@ from geometry_msgs.msg import PoseWithCovarianceStamped
 from lifecycle_msgs.srv import GetState
 from nav2_msgs.action import NavigateThroughPoses, NavigateToPose
 from tf2_ros import Duration
+import numpy as np
 
 
 import rclpy
@@ -27,6 +28,12 @@ class BasicNavigator(Node):
         self.feedback = None
         self.status = None
         self.amcl_pose = PoseWithCovarianceStamped()
+        self.declare_parameter('estimated_pose_x', rclpy.Parameter.Type.DOUBLE)
+        self.declare_parameter('estimated_pose_y', rclpy.Parameter.Type.DOUBLE)
+        self.declare_parameter('estimated_pose_angle', rclpy.Parameter.Type.DOUBLE)
+        self.declare_parameter('variance_x', rclpy.Parameter.Type.DOUBLE)
+        self.declare_parameter('variance_y', rclpy.Parameter.Type.DOUBLE)
+        self.declare_parameter('variance_angle', rclpy.Parameter.Type.DOUBLE)
         
         amcl_pose_qos = QoSProfile(
             durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
@@ -44,14 +51,16 @@ class BasicNavigator(Node):
         self.initial_pose_covariance = covariance
         self._setInitialPose()
 
+    def euler_to_quaternion(self, roll, pitch, yaw):
 
-    def cancelNav(self):
-        self.info('Canceling current goal.')
-        if self.result_future:
-            future = self.goal_handle.cancel_goal_async()
-            rclpy.spin_until_future_complete(self, future)
-        return
-    
+        qx = np.sin(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) - np.cos(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
+        qy = np.cos(roll/2) * np.sin(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.cos(pitch/2) * np.sin(yaw/2)
+        qz = np.cos(roll/2) * np.cos(pitch/2) * np.sin(yaw/2) - np.sin(roll/2) * np.sin(pitch/2) * np.cos(yaw/2)
+        qw = np.cos(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
+
+        return [qx, qy, qz, qw]
+
+
     def getFeedback(self):
         return self.feedback
 
@@ -66,10 +75,6 @@ class BasicNavigator(Node):
         return
 
     def _waitForNodeToActivate(self, node_name):
-        # Waits for the node within the tester namespace to become active
-        # This code is usually executed at the beninning of the script
-        # it is used to control that all the nodes are initiallized correctly 
-        # to avoid the code to fail during the execution
         self.debug('Waiting for ' + node_name + ' to become active..')
         node_service = node_name + '/get_state'
         state_client = self.create_client(GetState, node_service)
@@ -89,7 +94,6 @@ class BasicNavigator(Node):
         return
 
     def _waitForInitialPose(self):
-        # Se the initial pose
         while not self.initial_pose_received:
             self.info('Setting initial pose')
             self._setInitialPose()
@@ -98,15 +102,9 @@ class BasicNavigator(Node):
         return
 
     def _amclPoseCallback(self, msg):
-        # Save if the initial pose is been received
         self.amcl_pose = msg
         self.get_logger().info('recieved message on /amcl_pose')
         self.initial_pose_received = True
-        return
-
-    def _feedbackCallback(self, msg):
-        # local copy of the feedback callback for future use
-        self.feedback = msg.feedback
         return
 
     def _setInitialPose(self):
@@ -119,50 +117,28 @@ class BasicNavigator(Node):
         self.initial_pose_pub.publish(msg)
         return 
 
-    # Logger Functions:
-    # They are used to write string to the logger in a more easier way.
-    # Message print using logger are saved for multiple purpose (e.x debuggin in case of LARGE projects)
-    def info(self, msg):
-        self.get_logger().info(msg)
-        return
-
-    def warn(self, msg):
-        self.get_logger().warn(msg)
-        return
-
-    def error(self, msg):
-        self.get_logger().error(msg)
-        return
-
-    def debug(self, msg):
-        self.get_logger().debug(msg)
-        return
-
-
 def main(argv=sys.argv[1:]):
     rclpy.init()
-    # initialize the class of basic navigator
     navigator = BasicNavigator()
 
-    # Set initial pose of the robot with respect to map reference frame!
-    # !! In the PROJECT !! 
-    # The localization should be performed AUTONOUSLY by the robot
-    # HINT: The message PoseWithCovarianceStamped contain a covariance that indicate the confidence of the localization.
-
     initial_pose = Pose()
-    initial_pose.position.x = -1.0
-    initial_pose.position.y = 3.0
+    initial_pose.position.x = navigator.get_parameter('estimated_pose_x').get_parameter_value().double_value
+    initial_pose.position.y = navigator.get_parameter('estimated_pose_y').get_parameter_value().double_value
     initial_pose.position.z = 0.0
-    initial_pose.orientation.x = -2.0
-    initial_pose.orientation.y = -1.0
-    initial_pose.orientation.z = 0.0
-    initial_pose.orientation.w = 1.0
-    initial_pose_covariance = [10.0, 0.0, 0.0, 0.0, 0.0, 0.0, 
-                               0.0, 10.0, 0.0, 0.0, 0.0, 0.0,
+    x, y, z, w = navigator.euler_to_quaternion(0.0, 0.0, navigator.get_parameter('estimated_pose_angle').get_parameter_value().double_value)
+    initial_pose.orientation.x = x
+    initial_pose.orientation.y = y
+    initial_pose.orientation.z = z
+    initial_pose.orientation.w = w
+    var_x = navigator.get_parameter('variance_x').get_parameter_value().double_value
+    var_y = navigator.get_parameter('variance_y').get_parameter_value().double_value
+    var_angle = navigator.get_parameter('variance_angle').get_parameter_value().double_value
+    initial_pose_covariance = [var_x, 0.0, 0.0, 0.0, 0.0, 0.0, 
+                               0.0, var_y, 0.0, 0.0, 0.0, 0.0,
                                0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                                0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                                0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                               0.0, 0.0, 0.0, 0.0, 0.0, 2.0]
+                               0.0, 0.0, 0.0, 0.0, 0.0, var_angle]
 
     print('Sending initial pose...')
     navigator.setInitialPose(initial_pose, initial_pose_covariance)
