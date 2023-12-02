@@ -16,7 +16,7 @@ x_var = 1.0
 y_var = 1.0
 angle_var = 0.5
 ```
-giving the estimated valies for pose and the variances.
+giving the estimated values for pose and the variances.
 
 Example:
 ```bash
