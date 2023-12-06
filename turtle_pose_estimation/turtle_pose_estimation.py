@@ -2,17 +2,13 @@
 
 import time, sys
 
-from action_msgs.msg import GoalStatus
 from geometry_msgs.msg import Pose
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from lifecycle_msgs.srv import GetState
-from nav2_msgs.action import NavigateThroughPoses, NavigateToPose
-from tf2_ros import Duration
 import numpy as np
 
 
 import rclpy
-from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy, QoSHistoryPolicy, QoSReliabilityPolicy
 from rclpy.qos import QoSProfile
@@ -75,7 +71,7 @@ class BasicNavigator(Node):
         return
 
     def _waitForNodeToActivate(self, node_name):
-        self.debug('Waiting for ' + node_name + ' to become active..')
+        self.info('Waiting for ' + node_name + ' to become active..')
         node_service = node_name + '/get_state'
         state_client = self.create_client(GetState, node_service)
         while not state_client.wait_for_service(timeout_sec=1.0):
@@ -84,12 +80,12 @@ class BasicNavigator(Node):
         req = GetState.Request()
         state = 'unknown'
         while (state != 'active'):
-            self.debug('Getting ' + node_name + ' state...')
+            self.info('Getting ' + node_name + ' state...')
             future = state_client.call_async(req)
             rclpy.spin_until_future_complete(self, future)
             if future.result() is not None:
                 state = future.result().current_state.label
-                self.debug('Result of get_state: %s' % state)
+                self.info('Result of get_state: %s' % state)
             time.sleep(2)
         return
 
@@ -116,6 +112,10 @@ class BasicNavigator(Node):
         self.info('Publishing Initial Pose')
         self.initial_pose_pub.publish(msg)
         return 
+    
+    def info(self, msg):
+        self.get_logger().info(msg)
+        return
 
 def main(argv=sys.argv[1:]):
     rclpy.init()
