@@ -25,5 +25,5 @@ setup(
         'console_scripts': [
             'turtle_pose_estimation = turtle_pose_estimation.turtle_pose_estimation:main'
         ],
-    },
+    }
 )

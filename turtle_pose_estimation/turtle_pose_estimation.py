@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import time, sys
+import time, sys, math
 
 from geometry_msgs.msg import Pose
 from geometry_msgs.msg import PoseWithCovarianceStamped
@@ -46,6 +46,7 @@ class BasicNavigator(Node):
         self.initial_pose = initial_pose
         self.initial_pose_covariance = covariance
         self._setInitialPose()
+
 
     def euler_to_quaternion(self, roll, pitch, yaw):
 
